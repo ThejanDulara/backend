@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 import mysql.connector
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 from werkzeug.utils import secure_filename
 from datetime import timedelta
@@ -11,6 +11,8 @@ from email.mime.text import MIMEText
 import random
 import string
 from dotenv import load_dotenv
+
+now = datetime.now(timezone.utc)
 
 # Load environment variables from .env file
 load_dotenv()
@@ -939,8 +941,8 @@ def grant_user_access():
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'info.mediasense2025@gmail.com'  # Replace with your Gmail
-app.config['MAIL_PASSWORD'] = 'nmju kosl ifpu hfzt'     # Use App Password from Google Account
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')   # Replace with your Gmail
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')     # Use App Password from Google Account
 app.config['MAIL_DEFAULT_SENDER'] = 'info.mediasense2025@gmail.com'
 
 # Temporary storage for OTPs (in production, use Redis or database)
