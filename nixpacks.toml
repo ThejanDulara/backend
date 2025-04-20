@@ -8,4 +8,4 @@ commands = ["pip install -r requirements.txt"]
 commands = []
 
 [start]
-command = "gunicorn app:app""]
+command = "gunicorn app:app"
