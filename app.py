@@ -49,7 +49,7 @@ def get_db_connection():
 
 @app.route('/')
 def home():
-    return "Backend is running!"
+    return "Backend is running now!"
 
 
 @app.route('/api/projects', methods=['GET', 'POST'])
