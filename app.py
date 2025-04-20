@@ -10,6 +10,10 @@ import smtplib
 from email.mime.text import MIMEText
 import random
 import string
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 app = Flask(__name__)
@@ -23,10 +27,10 @@ CORS(app, resources={
 })
 # Database configuration
 db_config = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '',
-    'database': 'media_sense'
+    'host': os.getenv('DB_HOST'),  # default to 'localhost' if not set
+    'user': os.getenv('DB_USER'),
+    'password': os.getenv('DB_PASSWORD'),
+    'database': os.getenv('DB_NAME')
 }
 
 # File upload configuration
