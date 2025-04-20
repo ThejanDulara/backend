@@ -1,0 +1,11 @@
+# Ignore the uploads folder (local storage)
+uploads/
+
+# Ignore local cache, secrets, and dev files
+.env
+*.log
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
