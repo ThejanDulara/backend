@@ -1,2 +1,11 @@
-[nixpacks]
-providers = ["python"]
+[phases.setup]
+nixPkgs = ["python310"]
+
+[phases.install]
+commands = ["pip install -r requirements.txt"]
+
+[phases.build]
+commands = []
+
+[start]
+command = "gunicorn app:app""]
