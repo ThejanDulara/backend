@@ -11,6 +11,9 @@ from email.mime.text import MIMEText
 import random
 import string
 from dotenv import load_dotenv
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 
 now = datetime.now(timezone.utc)
 
@@ -32,16 +35,20 @@ db_config = {
     'host': os.getenv('DB_HOST'),  # default to 'localhost' if not set
     'user': os.getenv('DB_USER'),
     'password': os.getenv('DB_PASSWORD'),
-    'database': os.getenv('DB_NAME')
+    'database': os.getenv('DB_NAME'),
+    'port': os.getenv('DATABASE_PORT')
 }
 
-# File upload configuration
-UPLOAD_FOLDER = 'uploads'
-ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'gif'}
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # Ensure upload directory exists
+cloudinary.config(
+    cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
+    api_key=os.getenv('CLOUDINARY_API_KEY'),
+    api_secret=os.getenv('CLOUDINARY_API_SECRET'),
+    secure=True
+)
 
 
 def allowed_file(filename):
@@ -92,8 +99,7 @@ def handle_projects():
             projects = cursor.fetchall()
             # Add file URLs
             for project in projects:
-                if project['file_path']:
-                    project['file_url'] = f"http://{request.host}/uploads/{os.path.basename(project['file_path'])}"
+                project['file_url'] = project['file_path']
             return jsonify(projects)
 
         except Exception as e:
@@ -107,21 +113,21 @@ def handle_projects():
         cursor = conn.cursor()
 
         try:
-            file_path = None
+            file_url = None
             file = request.files.get('file')
 
             if file and file.filename:
-                if not allowed_file(file.filename):
-                    return jsonify({"error": "File type not allowed"}), 400
-
-                if file.content_length > MAX_FILE_SIZE:
-                    return jsonify({"error": "File too large (max 5MB)"}), 400
-
+                # Validate file type
                 filename = secure_filename(file.filename)
-                unique_filename = f"{datetime.now().timestamp()}_{filename}"
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-                file.save(file_path)
-                stored_path = unique_filename
+                if not allowed_file(filename):
+                    return jsonify({"error": "File type not allowed"}), 400
+                # Upload to Cloudinary
+                upload_result = cloudinary.uploader.upload(
+                    file,
+                    folder=os.getenv('CLOUDINARY_FOLDER'),
+                    resource_type="auto"
+                )
+                file_url = upload_result['secure_url']
 
             # Get form data
             data = request.form
@@ -153,7 +159,7 @@ def handle_projects():
                 column,
                 ave_value,
                 pr_value,
-                file_path
+                file_url
             )
 
             cursor.execute(query, values)
@@ -161,11 +167,11 @@ def handle_projects():
 
             return jsonify({"message": "Project added successfully!", "id": cursor.lastrowid}), 201
 
+        except cloudinary.exceptions.Error as e:
+            conn.rollback()
+            return jsonify({"error": f"File upload failed: {str(e)}"}), 500
         except Exception as e:
             conn.rollback()
-            # Clean up file if upload failed
-            if file_path and os.path.exists(file_path):
-                os.remove(file_path)
             return jsonify({"error": str(e)}), 500
         finally:
             cursor.close()
@@ -401,11 +407,6 @@ def handle_sections():
         conn.close()
 
 
-@app.route('/uploads/<filename>')
-def uploaded_file(filename):
-    filename = secure_filename(filename)
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-
 @app.route('/api/report/add', methods=['POST', 'OPTIONS'])
 def add_to_report():
     if request.method == 'OPTIONS':
@@ -540,23 +541,29 @@ def delete_project(project_id):
     cursor = conn.cursor(dictionary=True)
 
     try:
-        # First get the file path so we can delete the file
+        # First get the file URL so we can delete from Cloudinary
         cursor.execute("SELECT file_path FROM projects WHERE id = %s", (project_id,))
         project = cursor.fetchone()
 
         if not project:
             return jsonify({"error": "Project not found"}), 404
 
+        # Delete from Cloudinary if exists
+        if project['file_path']:
+            try:
+                # Extract public_id from URL
+                from urllib.parse import urlparse
+                url_path = urlparse(project['file_path']).path
+                public_id = os.path.splitext(url_path.split('/')[-1])[0]
+                cloudinary.uploader.destroy(
+                    f"{os.getenv('CLOUDINARY_FOLDER')}/{public_id}"
+                )
+            except Exception as e:
+                print(f"Error deleting file from Cloudinary: {str(e)}")
+
         # Delete the project
         cursor.execute("DELETE FROM projects WHERE id = %s", (project_id,))
         conn.commit()
-
-        # Delete the associated file if it exists
-        if project['file_path'] and os.path.exists(project['file_path']):
-            try:
-                os.remove(project['file_path'])
-            except Exception as e:
-                print(f"Error deleting file {project['file_path']}: {str(e)}")
 
         return jsonify({"message": "Project deleted successfully"}), 200
 
