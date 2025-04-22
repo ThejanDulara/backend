@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["python39", "python39Packages.pip"]
+nixPkgs = ["python39Full"]  # Includes pip and more tools
 
 [phases.install]
 cmds = ["python -m pip install -r requirements.txt"]
