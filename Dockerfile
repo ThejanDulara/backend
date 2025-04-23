@@ -14,4 +14,4 @@ RUN python -m ensurepip --upgrade \
 COPY . .
 
 # Run the application
-CMD ["python", "app.py"]
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8000"]
